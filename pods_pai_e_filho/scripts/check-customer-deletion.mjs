@@ -207,7 +207,8 @@ try {
       await db.query("update public.sales set customer_name=$2 where id=$1", [id, name]);
     }
     await rpc("confirm_receipt", [paid]);
-    await rpc("confirm_transfers", [[paid], "Pagamento anterior à exclusão"]);
+    const transferPreview = await rpc("preview_transfers", [[paid], null]);
+    await rpc("confirm_transfers_preview", [[paid], "Pagamento anterior à exclusão", transferPreview]);
     await rpc("cancel_sale", [cancelled, "Cancelamento anterior à exclusão"]);
     const ids = [due, credit, paid, cancelled];
     const names = await rows("select id,customer_name from public.sales where id=any($1::uuid[]) order by id", [ids]);

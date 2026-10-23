@@ -15,7 +15,7 @@ export const metadata = { title: "Venda" };
 
 function saleReturnPath(value: string | string[] | undefined) {
   const path = Array.isArray(value) ? value[0] : value;
-  return path && /^\/(?:inicio|relatorios|vendas)(?:\?[^#\\\u0000-\u001F\u007F]*)?$/.test(path)
+  return path && /^\/(?:inicio|relatorios|repasses|vendas)(?:\?[^#\\\u0000-\u001F\u007F]*)?$/.test(path)
     ? path
     : "/vendas";
 }
@@ -33,7 +33,9 @@ export default async function VendaPage({
     ? "Voltar ao início"
     : backHref.startsWith("/relatorios")
       ? "Voltar aos relatórios"
-      : "Voltar às vendas";
+      : backHref.startsWith("/repasses")
+        ? "Voltar aos repasses"
+        : "Voltar às vendas";
   const session = await getSessionState();
   const consultas = session.status === "ok" && isConsultasRole(session.profile.role_code);
   const [sale, catalog] = await Promise.all([

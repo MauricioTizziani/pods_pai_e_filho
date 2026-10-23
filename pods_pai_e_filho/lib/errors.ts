@@ -17,6 +17,9 @@ export function dbErrorMessage(
   fallback = "Não foi possível concluir a operação.",
 ) {
   if (!error?.message) return fallback;
+  if (isMissingSchema(error) && /preview_transfers|confirm_transfers_preview/i.test(error.message)) {
+    return "Execute a migration supabase/migrations/20261023140000_010_transfer_previews.sql no SQL Editor do Supabase para habilitar a conferência e a confirmação segura dos repasses.";
+  }
   if (isMissingSchema(error) && /delete_customer/i.test(error.message)) {
     return "Execute a migration supabase/migrations/20261023130000_009_customer_deletion.sql no SQL Editor do Supabase para habilitar a exclusão de clientes.";
   }

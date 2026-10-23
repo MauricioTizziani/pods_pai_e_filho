@@ -58,8 +58,8 @@ export function ConsultasDashboard({
       </div>
 
       <section className="stagger grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard label="A receber agora" value={n(summary.transfer_due_now)} icon={Send} featured hint={`${summary.due_now_sales} venda(s) · com repasse pendente`} href={filters.batchValue === "todos" ? "/repasses" : undefined} />
-        <StatCard label="A receber futuramente" value={n(summary.transfer_future)} icon={Clock} tone="info" hint={`${summary.future_sales} venda(s) ainda não recebidas`} href={filters.batchValue === "todos" ? "/repasses" : undefined} />
+        <StatCard label="A receber agora" value={n(summary.transfer_due_now)} icon={Send} featured hint={`${summary.due_now_sales} venda(s) · com repasse pendente`} href={buildFilterUrl("/repasses", filters.params, { lote: filters.batchValue, aba: "agora" })} />
+        <StatCard label="A receber futuramente" value={n(summary.transfer_future)} icon={Clock} tone="info" hint={`${summary.future_sales} venda(s) ainda não recebidas`} href={buildFilterUrl("/repasses", filters.params, { lote: filters.batchValue, aba: "futuro" })} />
         {costUnknown ? <UncertainMoneyCard label="Meu lucro" value={n(summary.father_profit_total)} unknown missing={summary.father_profit_missing_items} icon={TrendingUp} featured /> : <StatCard label="Meu lucro" value={n(summary.father_profit_total)} icon={TrendingUp} tone="success" accent hint="Lucro do pai nas vendas válidas deste recorte" />}
         {Number(summary.father_profit_missing_received_items) > 0 ? <UncertainMoneyCard label="Lucro já recebido" value={n(summary.father_profit_received)} unknown missing={summary.father_profit_missing_received_items} icon={PiggyBank} /> : <StatCard label="Lucro já recebido" value={n(summary.father_profit_received)} icon={PiggyBank} tone="success" hint="Lucro referente aos repasses já pagos" />}
         <StatCard label="Total já recebido" value={n(summary.transfer_received)} icon={HandCoins} tone="primary" accent hint="Repasses marcados como pagos" />

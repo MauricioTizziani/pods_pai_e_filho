@@ -174,7 +174,7 @@ export default async function InicioPage({
           icon={Send}
           featured
           hint="Vendas recebidas ou fiadas com repasse pendente"
-          href={batchFilter.batchId ? undefined : "/repasses"}
+          href={buildFilterUrl("/repasses", params, { lote: batchFilter.value, aba: "agora" })}
         />
       </section>
 

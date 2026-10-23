@@ -4,6 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionState } from "@/lib/auth";
 import { dbErrorMessage } from "@/lib/errors";
 import { revalidateCommerce } from "@/lib/revalidate";
+import { loadTransferPaymentPreview } from "@/lib/data/transfers";
+import {
+  isTransferBatchValue,
+  isTransferPaymentPreview,
+  normalizeTransferSaleIds,
+  type TransferPaymentPreview,
+  type TransferPaymentPreviewResult,
+} from "@/lib/domain/transfers";
 import type { ActionResult } from "@/lib/types";
 
 async function writerClient() {
@@ -118,13 +126,32 @@ export async function cancelSaleAction(saleId: string, reason: string): Promise<
   return { ok: true, id: saleId };
 }
 
-export async function confirmTransfersAction(saleIds: string[], notes: string): Promise<ActionResult> {
+export async function previewTransfersAction(saleIds: string[], batchValue: string): Promise<TransferPaymentPreviewResult> {
   const access = await writerClient();
   if (access.error || !access.supabase) return { ok: false, message: access.error ?? "Sem permissão." };
-  if (saleIds.length === 0) return { ok: false, message: "Selecione ao menos uma venda." };
-  const { data, error } = await access.supabase.rpc("confirm_transfers", {
-    p_sale_ids: saleIds,
+  const ids = normalizeTransferSaleIds(saleIds);
+  if (!ids) return { ok: false, message: "Selecione de 1 a 1000 vendas válidas, sem repetições." };
+  if (!isTransferBatchValue(batchValue)) return { ok: false, message: "Lote inválido. Atualize a página." };
+  return loadTransferPaymentPreview(ids, batchValue, access.supabase);
+}
+
+export async function confirmTransfersAction(
+  saleIds: string[],
+  notes: string,
+  preview?: TransferPaymentPreview,
+): Promise<ActionResult> {
+  const access = await writerClient();
+  if (access.error || !access.supabase) return { ok: false, message: access.error ?? "Sem permissão." };
+  const ids = normalizeTransferSaleIds(saleIds);
+  if (!ids) return { ok: false, message: "Selecione de 1 a 1000 vendas válidas, sem repetições." };
+  if (typeof notes !== "string" || !isTransferPaymentPreview(preview) ||
+    JSON.stringify(ids) !== JSON.stringify(normalizeTransferSaleIds(preview.saleIds))) {
+    return { ok: false, message: "Confira o valor integral e os lotes afetados antes de confirmar o repasse." };
+  }
+  const { data, error } = await access.supabase.rpc("confirm_transfers_preview", {
+    p_sale_ids: ids,
     p_notes: notes.trim() || null,
+    p_expected_preview: preview,
   });
   if (error) return { ok: false, message: dbErrorMessage(error) };
   revalidateCommerce();

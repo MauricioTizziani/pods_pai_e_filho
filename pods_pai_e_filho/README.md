@@ -5,7 +5,7 @@ Controle de estoque, vendas, valores a receber, lucro e repasses da sociedade en
 ## Preparar
 
 1. Crie um projeto no [Supabase](https://database.new).
-2. No SQL Editor, execute os arquivos de `supabase/migrations/` **em ordem crescente pelo nome**: `20261001140000_001_pods_init.sql`, `20261001150000_002_product_safety.sql`, `20261001160000_003_variant_is_ice.sql`, `20261002100000_004_consultas_cost_snapshots.sql`, `20261002110000_005_consultas_hide_credit_filter.sql`, `20261002120000_006_whatsapp_promotion.sql`, `20261007120000_007_purchase_batches.sql`, `20261023120000_008_batch_corrections.sql` e `20261023130000_009_customer_deletion.sql`.
+2. No SQL Editor, execute os arquivos de `supabase/migrations/` **em ordem crescente pelo nome**: `20261001140000_001_pods_init.sql`, `20261001150000_002_product_safety.sql`, `20261001160000_003_variant_is_ice.sql`, `20261002100000_004_consultas_cost_snapshots.sql`, `20261002110000_005_consultas_hide_credit_filter.sql`, `20261002120000_006_whatsapp_promotion.sql`, `20261007120000_007_purchase_batches.sql`, `20261023120000_008_batch_corrections.sql`, `20261023130000_009_customer_deletion.sql` e `20261023140000_010_transfer_previews.sql`.
 3. Copie `.env.example` para `.env.local` e preencha:
 
 ```env
@@ -83,9 +83,21 @@ O teste usa PostgreSQL em memória (PGlite), sem credenciais ou acesso ao Supaba
 
 ### Filtros iniciais
 
-**Dashboard** e **Relatórios** iniciam no lote aberto com a compra mais recente. Sem lote aberto, usam o finalizado mais recente; sem lotes válidos, usam **Todos os lotes**, incluindo o histórico sem lote. Empates usam criação, número do lote e identificador. Lotes cancelados não são selecionados automaticamente.
+**Dashboard**, **Relatórios** e **Repasses** iniciam no lote aberto com a compra mais recente, usando a mesma função `resolveBatchFilter`. Sem lote aberto, usam o finalizado mais recente; sem lotes válidos, usam **Todos os lotes**, incluindo o histórico sem lote. Empates usam criação, número do lote e identificador. Lotes cancelados não são selecionados automaticamente.
 
 A seleção fica na URL e é respeitada nas atualizações e na volta de uma venda à Dashboard. **Todos os lotes** permanece disponível. Período e demais filtros são combinados com o lote. Os valores financeiros usam as alocações existentes de cada item vendido; uma venda com dois lotes contribui apenas com sua parcela em cada lote. Estoque atual, custo do estoque e alertas continuam gerais e são identificados assim na tela.
+
+Em **Repasses**, cards, contadores e as abas de valores a enviar, futuros e pagos usam a mesma consulta completa, sem o antigo limite de 300 vendas. A escolha do lote e da aba é preservada na URL, inclusive no retorno dos detalhes da venda e após confirmar o repasse. Mudar o lote limpa seleções em grupo e a conferência de pagamento aberta. **Selecionar todas** abrange somente as vendas a enviar do filtro atual. CONSULTAS continua em leitura, com os termos do pai e sem classificação Fiado ou lucro do filho. Falhas de consulta são apresentadas separadamente de lotes sem resultados.
+
+O pagamento existente é integral por venda. Antes de confirmar uma ou várias vendas, a tela consulta uma prévia com o valor integral e as parcelas reais por lote, incluindo histórico sem lote quando houver. Se houver parcelas fora do lote selecionado, informa esse efeito e exige a confirmação explícita do total integral. A confirmação revalida os valores, os vínculos e a elegibilidade sob travas no banco e então reutiliza a função de pagamento anterior, com seus registros e auditoria. Uma prévia desatualizada ou um pagamento repetido é recusado; não foi criado pagamento parcial por lote.
+
+Para habilitar essa conferência em uma instalação existente, aplique `supabase/migrations/20261023140000_010_transfer_previews.sql` após a 009. Ela adiciona as RPCs de prévia e confirmação protegida e impede chamadas diretas ao endpoint de confirmação antigo. O aplicativo não aplica migrations automaticamente.
+
+```bash
+npm run check:transfer-filters
+```
+
+Esse teste usa as páginas e consultas reais com dados simulados e um PostgreSQL descartável em memória, sem credenciais nem acesso ao Supabase. Cobre seleção inicial e explícita, valores por lote e consolidados, histórico sem lote, CONSULTAS, leitura completa de mais de 300 registros, confirmação integral, dados alterados desde a prévia, permissões e prevenção de pagamento duplicado. Concorrência simultânea entre conexões deve ser conferida em homologação.
 
 **Produtos** inicia com **Ativos**, mantendo **Inativos** e **Todos**. O status é aplicado na consulta, independentemente do estoque e dos lotes; um produto ativo sem saldo continua visível. Produtos inativos continuam incluídos no histórico de vendas e nos relatórios. Os padrões também se aplicam a CONSULTAS, com as permissões e a visão financeira do pai preservadas. Esta melhoria não exige uma nova migration.
 
