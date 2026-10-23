@@ -5,7 +5,7 @@ Controle de estoque, vendas, valores a receber, lucro e repasses da sociedade en
 ## Preparar
 
 1. Crie um projeto no [Supabase](https://database.new).
-2. No SQL Editor, execute os arquivos de `supabase/migrations/` **em ordem crescente pelo nome**: `20261001140000_001_pods_init.sql`, `20261001150000_002_product_safety.sql`, `20261001160000_003_variant_is_ice.sql`, `20261002100000_004_consultas_cost_snapshots.sql`, `20261002110000_005_consultas_hide_credit_filter.sql`, `20261002120000_006_whatsapp_promotion.sql`, `20261007120000_007_purchase_batches.sql` e `20261023120000_008_batch_corrections.sql`.
+2. No SQL Editor, execute os arquivos de `supabase/migrations/` **em ordem crescente pelo nome**: `20261001140000_001_pods_init.sql`, `20261001150000_002_product_safety.sql`, `20261001160000_003_variant_is_ice.sql`, `20261002100000_004_consultas_cost_snapshots.sql`, `20261002110000_005_consultas_hide_credit_filter.sql`, `20261002120000_006_whatsapp_promotion.sql`, `20261007120000_007_purchase_batches.sql`, `20261023120000_008_batch_corrections.sql` e `20261023130000_009_customer_deletion.sql`.
 3. Copie `.env.example` para `.env.local` e preencha:
 
 ```env
@@ -64,6 +64,22 @@ npm run check:batch-corrections
 ```
 
 O teste aplica todas as migrations em um banco descartável, simula os papéis de acesso e cobre diferença de entrada, saldo insuficiente, venda posterior, parcelas em vários lotes, custos diferentes, legado, dados alterados desde a prévia, reenvio, rollback, auditoria e cancelamento/edição após a realocação. O teste de concorrência revalida o saldo depois de uma operação interveniente; a execução simultânea em múltiplas conexões deve ser conferida no ambiente de homologação.
+
+### Excluir clientes preservando as vendas
+
+Em instalações existentes, aplique `supabase/migrations/20261023130000_009_customer_deletion.sql` após a 008. A migration reutiliza `sales.customer_name`, preenche somente descrições ausentes a partir do cadastro e mantém `sales.customer_id` opcional com `ON DELETE SET NULL`. Descrições históricas já preenchidas são preservadas exatamente.
+
+Somente ADMIN pode usar **Excluir cliente**, na listagem ou no formulário de edição, após confirmar o nome. A operação `delete_customer` preenche nomes ausentes, desvincula todas as vendas, exclui o cadastro e registra responsável, horário, ID, nome e quantidade de vendas desvinculadas na auditoria, em uma única transação. Uma falha desfaz todas essas etapas. A exclusão direta pela API de tabelas permanece sem permissão.
+
+Vendas recebidas, pendentes, fiadas e canceladas mantêm seus nomes, itens, preços, custos, pagamentos, repasses, estoque e lotes. Não existem outras chaves estrangeiras operacionais para clientes no esquema atual; os recebíveis e repasses pertencem às vendas. Consultas e telas já usam o nome salvo na venda, e dívidas continuam separadas pelo ID de cada venda. A edição passa a mostrar **Sem cadastro**, sem recriar nem associar clientes pelo nome.
+
+Novas vendas vinculadas recebem o nome do cadastro no banco, mesmo se o formulário enviar outro nome. As RPCs de criação, edição e exclusão compartilham uma trava transacional adquirida antes das travas de linhas: uma criação concorrente termina antes da exclusão, ou seu ID é revalidado depois dela. Um ID já excluído gera erro e rollback; o usuário pode atualizar a página e informar o nome sem cadastro. A exclusão atualiza a listagem e invalida o cache das demais telas e seletores.
+
+```bash
+npm run check:customer-deletion
+```
+
+O teste usa PostgreSQL em memória (PGlite), sem credenciais ou acesso ao Supabase. Cobre migração, nomes históricos e ausentes, preservação financeira e de estoque/lotes, edição posterior, pesquisa, permissões, auditoria e rollback. Verifica as duas ordens possíveis de criação/exclusão; por usar uma única sessão, não substitui um teste simultâneo com duas conexões no ambiente de homologação.
 
 ### Filtros iniciais
 

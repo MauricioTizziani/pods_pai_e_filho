@@ -236,6 +236,26 @@ export async function saveCustomerAction(input: {
   return { ok: true, id: data.id };
 }
 
+export async function deleteCustomerAction(customerId: string): Promise<ActionResult> {
+  const session = await getSessionState();
+  if (
+    session.status !== "ok" ||
+    !session.profile.can_write ||
+    session.profile.role_code.toLowerCase() !== "admin"
+  ) {
+    return { ok: false, message: "Somente o Administrador pode excluir clientes." };
+  }
+  if (typeof customerId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(customerId)) {
+    return { ok: false, message: "Informe um cliente válido." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("delete_customer", { p_customer_id: customerId });
+  if (error) return { ok: false, message: dbErrorMessage(error) };
+  revalidateCommerce();
+  return { ok: true, id: customerId };
+}
+
 export async function saveCustomerTypeAction(name: string): Promise<ActionResult> {
   const access = await writerClient();
   if (access.error || !access.supabase) return { ok: false, message: access.error ?? "Sem permissão." };
