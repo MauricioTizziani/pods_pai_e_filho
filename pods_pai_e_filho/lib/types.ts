@@ -313,3 +313,65 @@ export type SaleBatchAllocation = {
   reversed_at: string | null;
   batch_number: number | null;
 };
+
+export type BatchEditInput = {
+  batchId: string;
+  purchaseDate: string;
+  notes: string;
+  samePurchaseConfirmed?: boolean;
+  items: { batchItemId?: string; variantId: string; quantity: number; unitCost: number }[];
+};
+
+export type SaleBatchCorrectionInput = {
+  batchId: string;
+  saleItemId: string;
+  sourceAllocationId: string | null;
+  quantity: number;
+  destinationItemId: string;
+};
+
+export type CorrectionPreview = {
+  request_id: string;
+  summary: {
+    kind: "entry" | "allocation";
+    batch_id: string;
+    batch_number: number;
+    sale_id?: string;
+    description: string;
+    stock_delta: number;
+    changes: {
+      label: string;
+      before: string | number | null;
+      after: string | number | null;
+      unit?: "money" | "quantity" | "text";
+    }[];
+  };
+};
+
+export type CorrectionPreviewResult =
+  | { ok: true; preview: CorrectionPreview }
+  | { ok: false; message: string };
+
+export type CorrectionSaleCandidate = {
+  saleId: string;
+  saleDate: string;
+  createdAt: string;
+  customerName: string;
+  items: {
+    id: string;
+    productId: string;
+    variantId: string;
+    productName: string;
+    variantName: string;
+    quantity: number;
+    allocations: {
+      id: string;
+      batchItemId: string;
+      batchId: string;
+      batchNumber: number;
+      quantity: number;
+      unitCost: number;
+    }[];
+    unallocatedQuantity: number;
+  }[];
+};

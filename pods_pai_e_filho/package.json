@@ -11,6 +11,7 @@
     "check:promotion": "node --experimental-strip-types scripts/check-promotion.ts",
     "check:batch-filters": "node --experimental-strip-types scripts/check-batch-filters.ts",
     "check:batch-sales": "node --experimental-strip-types scripts/check-batch-sales.ts",
+    "check:batch-corrections": "node scripts/check-batch-corrections.mjs",
     "check:financial-filters": "node scripts/check-financial-filters.mjs",
     "check:product-filters": "node scripts/check-product-filters.mjs",
     "check:dashboard-filters": "node scripts/check-dashboard-filters.mjs",
@@ -33,6 +34,7 @@
     "tailwind-merge": "^3.3.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.11",
     "@eslint/eslintrc": "^3",
     "@types/node": "^20",
     "@types/react": "^19",

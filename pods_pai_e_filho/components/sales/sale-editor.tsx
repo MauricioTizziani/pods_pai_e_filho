@@ -16,6 +16,7 @@ import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { CreditBadge, PaymentBadge, TransferBadge } from "@/components/sales/badges";
 import { cn } from "@/lib/utils";
+import { CorrectionAuditDetails } from "@/components/stock/correction-history";
 
 const auditLabels: Record<string, string> = {
   "sale.created": "Venda registrada",
@@ -23,6 +24,9 @@ const auditLabels: Record<string, string> = {
   "sale.cancelled": "Venda cancelada",
   "sale.payment_confirmed": "Recebimento confirmado",
   "transfer.confirmed": "Repasse confirmado",
+  "batch.sale_reallocated": "Origem de lote corrigida",
+  "sale.batch_corrected": "Origem de lote corrigida",
+  "sale.batch_reallocated": "Origem de lote corrigida",
 };
 
 export function SaleEditor({
@@ -401,6 +405,7 @@ export function SaleEditor({
                   {formatDateTime(entry.created_at)}
                   {entry.user_name ? ` · ${entry.user_name}` : ""}
                 </p>
+                {!consultas && entry.action.includes("batch") ? <CorrectionAuditDetails metadata={entry.metadata} /> : null}
               </li>
             ))}
           </ol>

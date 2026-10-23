@@ -1,12 +1,16 @@
+import Link from "next/link";
+import { History, Link2, Pencil } from "lucide-react";
 import { getSessionState } from "@/lib/auth";
-import { getBatchDetails } from "@/lib/data/batches";
-import { formatBRL, formatDate } from "@/lib/format";
+import { getBatchDetails, listBatchHistory, listBatchLinkedSales } from "@/lib/data/batches";
+import { formatBRL, formatDate, formatDateTime, shortId } from "@/lib/format";
 import type { BatchOverview } from "@/lib/types";
 import { Notice } from "@/components/feedback/notice";
 import { PageHeading } from "@/components/shell/page-heading";
 import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { CancelBatchButton } from "@/components/stock/cancel-batch-button";
+import { CorrectionHistory } from "@/components/stock/correction-history";
+import { buttonVariants } from "@/components/ui/button";
 
 export const metadata = { title: "Detalhes do lote" };
 
@@ -52,8 +56,14 @@ export default async function LoteDetailPage({ params }: { params: Promise<{ id:
   if (!result.ok) return <Notice>{result.message.includes("batch") || result.message.includes("schema") ? "Execute a migration de lotes no Supabase para habilitar esta tela." : result.message}</Notice>;
   const { batch, items } = result;
   const admin = session.profile.can_write;
+  const isAdmin = session.profile.role_code.toLowerCase() === "admin";
+  const canEdit = isAdmin && batch.status === "ABERTO";
   const canCancel = admin && batch.status === "ABERTO" && !batch.has_sales &&
     batch.total_purchased === batch.quantity_remaining;
+  const [linked, history] = await Promise.all([
+    listBatchLinkedSales(id, !admin),
+    isAdmin ? listBatchHistory(id) : Promise.resolve(null),
+  ]);
 
   return (
     <div className="grid w-full min-w-0 gap-5">
@@ -65,6 +75,8 @@ export default async function LoteDetailPage({ params }: { params: Promise<{ id:
       >
         {batch.is_legacy ? <Badge variant="info">ESTOQUE LEGADO</Badge> : null}
         <Badge variant={batch.status === "ABERTO" ? "warning" : batch.status === "FINALIZADO" ? "success" : "neutral"}>{batch.status}</Badge>
+        {canEdit ? <Link href={"/lotes/" + id + "/editar"} className={buttonVariants({ variant: "outline", size: "sm" })}><Pencil />Editar lote</Link> : null}
+        {canEdit ? <Link href={"/lotes/" + id + "/editar#vincular-venda"} className={buttonVariants({ variant: "secondary", size: "sm" })}><Link2 />Vincular venda existente</Link> : null}
         {canCancel ? <CancelBatchButton batchId={batch.batch_id} isLegacy={batch.is_legacy} /> : null}
       </PageHeading>
 
@@ -106,6 +118,19 @@ export default async function LoteDetailPage({ params }: { params: Promise<{ id:
           </div>
         )}
       </Panel>
+      <Panel title="Vendas vinculadas" description="As quantidades exibidas correspondem à parcela desta venda vinculada ao lote.">
+        {!linked.ok ? <Notice>{linked.message}</Notice> : !linked.sales.length ? <p className="text-sm text-muted-foreground">Nenhuma venda ativa vinculada a este lote.</p> : <div className="grid gap-3">
+          {linked.sales.map((sale) => <div key={sale.id} className="grid gap-2 rounded-lg border border-border bg-surface p-3 text-sm">
+            <Link href={"/vendas/" + sale.id} className="w-fit font-semibold text-primary underline underline-offset-4">{sale.customer_name} · #{shortId(sale.id)}</Link>
+            <p className="text-xs text-muted-foreground">Venda ocorrida em {formatDate(sale.sale_date)} · Cadastrada em {formatDateTime(sale.created_at)}</p>
+            <p>{sale.items_label} · <strong>{sale.quantity}</strong> unidade(s) deste lote</p>
+            {canEdit ? <Link href={"/lotes/" + id + "/editar?venda=" + sale.id + "#vincular-venda"} className="w-fit text-xs text-primary underline underline-offset-4">Conferir origem desta venda</Link> : null}
+          </div>)}
+        </div>}
+      </Panel>
+      {isAdmin && history ? <Panel title="Histórico de correções do lote" icon={History} description="Responsável, justificativa e valores anteriores e posteriores.">
+        {history.ok ? <CorrectionHistory history={history.history} /> : <Notice>{history.message}</Notice>}
+      </Panel> : null}
     </div>
   );
 }

@@ -208,18 +208,29 @@ assert.equal(cards(await render("all")).find((card) => card.props.product.id ===
 // Sale details preserve a safe origin URL and all existing editor/batch data.
 function Heading() {}
 function Editor() {}
+function LinkMarker() {}
+function PanelMarker() {}
 const allocations = [{ batch_id: "lote-preservado" }];
-const historicalSale = { id: "sale-1", customer_name: "Cliente", sale_date: "2026-10-07", product_name: "Produto histórico", variant_name: "Grape Ice" };
+const historicalSale = { id: "sale-1", customer_name: "Cliente", sale_date: "2026-10-07", product_name: "Produto histórico", variant_name: "Grape Ice", is_valid: true };
+const historicalItems = [{ id: "item-historico", product_id: "historico-inativo", variant_id: "sabor-historico" }];
+const batchItems = [
+  { batch_id: "destino-compativel", batch_number: 7, product_id: "historico-inativo", variant_id: "sabor-historico", status: "ABERTO" },
+  { batch_id: "outro-sabor", batch_number: 8, product_id: "historico-inativo", variant_id: "outro-sabor", status: "ABERTO" },
+  { batch_id: "lote-finalizado", batch_number: 9, product_id: "historico-inativo", variant_id: "sabor-historico", status: "FINALIZADO" },
+];
 let requestedConsultas;
 let catalogArguments;
 const { default: salePage } = loadTs("app/(painel)/vendas/[id]/page.tsx", {
+  "next/link": { default: LinkMarker },
   "next/navigation": { notFound: () => { throw new Error("notFound"); } },
   "@/lib/auth": { getSessionState: async () => ({ status: "ok", profile: { can_write: role === "admin", role_code: role } }) },
-  "@/lib/data/catalog": { loadCatalog: async (...args) => { catalogArguments = args; return { ok: true, data: { products: [{ id: "historico-inativo", active: false }] } }; } },
-  "@/lib/data/sales": { getSale: async (id, consultas) => { assert.equal(id, "sale-1"); requestedConsultas = consultas; return { ok: true, sale: historicalSale, items: [], batchAllocations: allocations, audit: [] }; } },
+  "@/lib/data/catalog": { loadCatalog: async (...args) => { catalogArguments = args; return { ok: true, data: { products: [{ id: "historico-inativo", active: false }], batchItems } }; } },
+  "@/lib/data/sales": { getSale: async (id, consultas) => { assert.equal(id, "sale-1"); requestedConsultas = consultas; return { ok: true, sale: historicalSale, items: historicalItems, batchAllocations: allocations, audit: [] }; } },
   "@/lib/format": { formatDate: (value) => value, shortId: (value) => value },
   "@/components/feedback/notice": {}, "@/components/shell/page-heading": { PageHeading: Heading },
   "@/components/sales/sale-editor": { SaleEditor: Editor },
+  "@/components/ui/panel": { Panel: PanelMarker },
+  "@/components/ui/button": { buttonVariants: () => "outline-button" },
   "@/lib/domain/roles": loadTs("lib/domain/roles.ts"),
 });
 async function detail(voltar) {
@@ -238,6 +249,7 @@ for (const origin of [
   assert.equal(editor.props.batchAllocations, allocations);
   assert.equal(editor.props.sale, historicalSale);
   assert.equal(editor.props.catalog.products[0].active, false);
+  assert.deepEqual(elements(pageTree).filter((element) => element.type === LinkMarker).map((element) => element.props.href), ["/lotes/destino-compativel/editar?venda=sale-1#vincular-venda"]);
   assert.deepEqual(catalogArguments, []);
 }
 for (const invalid of [
@@ -249,10 +261,12 @@ assert.equal(back(await detail(["/relatorios?de=2026-10-01", "//evil.invalid"]))
 assert.equal(back(await detail("/inicio")).label, "Voltar ao início");
 assert.equal(back(await detail("/relatorios")).label, "Voltar aos relatórios");
 role = "CONSULTAS";
-const readonlyDetail = elements(await detail("/inicio")).find((element) => element.type === Editor);
+const readonlyPage = await detail("/inicio");
+const readonlyDetail = elements(readonlyPage).find((element) => element.type === Editor);
 assert.equal(requestedConsultas, true);
 assert.equal(readonlyDetail.props.consultas, true);
 assert.equal(readonlyDetail.props.canWrite, false);
+assert.equal(elements(readonlyPage).some((element) => element.type === PanelMarker), false);
 
 console.log("Produtos OK: Ativos por padrão, status antes do limite, estoque zero, pesquisa/Ice, URL, inativação e histórico preservados.");
 console.log("Retorno de venda OK: origens locais com filtros, fallback seguro, lote/editor e permissões preservados.");

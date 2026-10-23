@@ -17,6 +17,9 @@ export function dbErrorMessage(
   fallback = "Não foi possível concluir a operação.",
 ) {
   if (!error?.message) return fallback;
+  if (isMissingSchema(error) && /batch_correction|preview_batch_edit|preview_sale_batch_correction|confirm_batch_correction/i.test(error.message)) {
+    return "Execute a migration supabase/migrations/20261023120000_008_batch_corrections.sql no SQL Editor do Supabase para habilitar as correções de lotes.";
+  }
   if (/purchase_batches|batch_items|batch_item_overview|batch_overview|create_purchase|create_legacy_batch|sale_item_batch_allocations/i.test(error.message)) {
     return "Execute a migration supabase/migrations/20261007120000_007_purchase_batches.sql no SQL Editor do Supabase para habilitar compras e lotes.";
   }

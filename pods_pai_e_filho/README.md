@@ -5,7 +5,7 @@ Controle de estoque, vendas, valores a receber, lucro e repasses da sociedade en
 ## Preparar
 
 1. Crie um projeto no [Supabase](https://database.new).
-2. No SQL Editor, execute os arquivos de `supabase/migrations/` **em ordem crescente pelo nome**: `20261001140000_001_pods_init.sql`, `20261001150000_002_product_safety.sql`, `20261001160000_003_variant_is_ice.sql`, `20261002100000_004_consultas_cost_snapshots.sql`, `20261002110000_005_consultas_hide_credit_filter.sql`, `20261002120000_006_whatsapp_promotion.sql` e `20261007120000_007_purchase_batches.sql`.
+2. No SQL Editor, execute os arquivos de `supabase/migrations/` **em ordem crescente pelo nome**: `20261001140000_001_pods_init.sql`, `20261001150000_002_product_safety.sql`, `20261001160000_003_variant_is_ice.sql`, `20261002100000_004_consultas_cost_snapshots.sql`, `20261002110000_005_consultas_hide_credit_filter.sql`, `20261002120000_006_whatsapp_promotion.sql`, `20261007120000_007_purchase_batches.sql` e `20261023120000_008_batch_corrections.sql`.
 3. Copie `.env.example` para `.env.local` e preencha:
 
 ```env
@@ -44,6 +44,26 @@ Em instalações existentes, execute `20261007120000_007_purchase_batches.sql` d
 Vendas consomem primeiro o estoque legado sem origem conhecida e depois os lotes em FIFO, respeitando produto e sabor. O custo de cada lote é guardado na compra e o custo da venda considera as unidades alocadas. Cancelar a venda devolve cada unidade ao lote original; os lotes sem saldo são finalizados automaticamente. A tela **Lotes** está disponível em modo somente leitura para CONSULTAS e mostra os indicadores do pai; o lucro do filho permanece exclusivo do ADMIN.
 
 ADMIN pode usar **Lotes > Associar estoque legado** para classificar saldos antigos sem alterar o estoque geral. Essa ação exige quantidade disponível e custo histórico conhecido; sem esse dado, mantenha as unidades sem lote.
+
+### Editar lotes e corrigir a origem de vendas
+
+Em instalações que já usam lotes, execute somente `supabase/migrations/20261023120000_008_batch_corrections.sql` no SQL Editor do Supabase. O aplicativo exige essa migration para confirmar correções. Ela não é aplicada automaticamente pelo login ou pela chave pública.
+
+O ADMIN encontra **Editar lote** na listagem e nos detalhes dos lotes abertos. Pode corrigir a data e as observações, complementar uma entrada incompleta da mesma compra e adicionar sabores omitidos. Quantidades vendidas e saldos são apresentados para conferência. Os itens existentes mantêm produto e sabor, e os custos de itens com histórico de venda ficam protegidos. Cada compra independente continua gerando um novo lote.
+
+Em **Vincular venda existente / corrigir lote da venda**, busque o cliente, identificador, produto ou sabor, escolha o item e a parcela de origem e informe a quantidade a realocar. As datas de ocorrência e cadastro da venda aparecem separadamente. O destino precisa ter saldo do mesmo produto e sabor e ter entrada compatível com a data real da venda. A data de cadastro da venda não limita o vínculo. Repasses já conciliados e custos históricos desconhecidos bloqueiam a correção com uma mensagem explicativa.
+
+Antes de confirmar, confira as quantidades, os saldos e o impacto no custo e no lucro. Informe a justificativa e marque a confirmação explícita. A correção da entrada movimenta apenas a diferença; a correção de origem devolve à origem e consome no destino em uma única transação, mantendo estoque geral, venda, preços, pagamentos e repasses. O legado exige baixa já registrada e verificável e não recebe uma segunda baixa. Correções da classificação de estoque legado continuam sem alterar o estoque geral.
+
+Cada prévia pertence ao administrador que a gerou. A confirmação revalida os dados sob travas no banco, bloqueia uma prévia desatualizada e permite reenviar a mesma solicitação sem duplicação. Os vínculos anteriores, as movimentações e a justificativa ficam preservados no histórico dos lotes e da venda. Os status automáticos de esgotamento e reabertura são mantidos; lotes finalizados ou cancelados continuam sem edição manual. CONSULTAS continua somente visualizando as informações permitidas.
+
+Para validar as correções em PostgreSQL local em memória, sem usar credenciais nem alterar o Supabase:
+
+```bash
+npm run check:batch-corrections
+```
+
+O teste aplica todas as migrations em um banco descartável, simula os papéis de acesso e cobre diferença de entrada, saldo insuficiente, venda posterior, parcelas em vários lotes, custos diferentes, legado, dados alterados desde a prévia, reenvio, rollback, auditoria e cancelamento/edição após a realocação. O teste de concorrência revalida o saldo depois de uma operação interveniente; a execução simultânea em múltiplas conexões deve ser conferida no ambiente de homologação.
 
 ### Filtros iniciais
 
