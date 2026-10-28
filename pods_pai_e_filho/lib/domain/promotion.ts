@@ -25,6 +25,8 @@ export type PromotionVariant = {
 export type PromotionProduct = {
   id: string;
   name: string;
+  brand: string;
+  model: string;
   promotion_name: string | null;
   approximate_puffs: number | null;
   promotion_features: string[];
@@ -82,6 +84,27 @@ function singleLine(value: string) {
   return value.trim().replace(/\s+/g, " ");
 }
 
+/**
+ * Centralizes the product identity shown in the preview, the copied text and the
+ * WhatsApp share so the three never diverge: "Name — BRAND MODEL". Brand and/or
+ * model are omitted when empty, and either piece already present in the name
+ * (case-insensitive) is skipped to avoid repeating it.
+ */
+export function formatProductIdentity(
+  name: string,
+  brand: string | null | undefined,
+  model: string | null | undefined,
+) {
+  const cleanName = singleLine(name ?? "");
+  const normalizedName = cleanName.toUpperCase();
+  const suffix = [brand, model]
+    .map((value) => singleLine(value ?? ""))
+    .filter((value) => value && !normalizedName.includes(value.toUpperCase()))
+    .join(" ")
+    .toUpperCase();
+  return suffix ? `${cleanName} — ${suffix}` : cleanName;
+}
+
 function flavorName(variant: PromotionVariant) {
   return getFlavorDisplayName({
     name: normalizeFlavorName(singleLine(variant.name), variant.is_ice),
@@ -126,7 +149,7 @@ export function buildWhatsAppPromotion(snapshot: PromotionSnapshot): PromotionMe
       .filter((variant) => variant.active !== false && Number.isFinite(variant.quantity) && variant.quantity > 0)
       .sort((left, right) => compareText(flavorName(left), flavorName(right)) || compareText(left.id, right.id));
     if (variants.length === 0) continue;
-    const name = singleLine(product.promotion_name?.trim() || product.name);
+    const name = formatProductIdentity(product.promotion_name?.trim() || product.name, product.brand, product.model);
     const features = product.promotion_features.map(singleLine).filter(Boolean);
     const flavors = variants.map(flavorName);
     if (!name || INVALID_TEXT.test(name) || features.some((feature) => INVALID_TEXT.test(feature))

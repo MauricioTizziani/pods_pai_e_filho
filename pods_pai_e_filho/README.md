@@ -5,7 +5,7 @@ Controle de estoque, vendas, valores a receber, lucro e repasses da sociedade en
 ## Preparar
 
 1. Crie um projeto no [Supabase](https://database.new).
-2. No SQL Editor, execute os arquivos de `supabase/migrations/` **em ordem crescente pelo nome**: `20261001140000_001_pods_init.sql`, `20261001150000_002_product_safety.sql`, `20261001160000_003_variant_is_ice.sql`, `20261002100000_004_consultas_cost_snapshots.sql`, `20261002110000_005_consultas_hide_credit_filter.sql`, `20261002120000_006_whatsapp_promotion.sql`, `20261007120000_007_purchase_batches.sql`, `20261023120000_008_batch_corrections.sql`, `20261023130000_009_customer_deletion.sql` e `20261023140000_010_transfer_previews.sql`.
+2. No SQL Editor, execute os arquivos de `supabase/migrations/` **em ordem crescente pelo nome**: `20261001140000_001_pods_init.sql`, `20261001150000_002_product_safety.sql`, `20261001160000_003_variant_is_ice.sql`, `20261002100000_004_consultas_cost_snapshots.sql`, `20261002110000_005_consultas_hide_credit_filter.sql`, `20261002120000_006_whatsapp_promotion.sql`, `20261007120000_007_purchase_batches.sql`, `20261023120000_008_batch_corrections.sql`, `20261023130000_009_customer_deletion.sql`, `20261023140000_010_transfer_previews.sql` e `20261028120000_011_whatsapp_promotion_brand_model.sql`.
 3. Copie `.env.example` para `.env.local` e preencha:
 
 ```env
@@ -139,9 +139,11 @@ npm run check:finance
 
 ## Divulgação no WhatsApp
 
-Em instalações existentes, execute somente a nova migration `20261002120000_006_whatsapp_promotion.sql` no SQL Editor do Supabase antes de usar a divulgação. Ela adiciona as configurações sem alterar saldos, vendas, preços ou alertas de estoque baixo. Acesso de login ao aplicativo e chave pública do Supabase não permitem executar migrations.
+Em instalações existentes, execute `20261002120000_006_whatsapp_promotion.sql` no SQL Editor do Supabase antes de usar a divulgação, e depois `20261028120000_011_whatsapp_promotion_brand_model.sql`. A primeira adiciona as configurações sem alterar saldos, vendas, preços ou alertas de estoque baixo; a segunda apenas estende o retorno da consulta existente com `brand` e `model`, que já existem em `public.products` desde a migration 001 — nenhuma coluna nova é criada. Acesso de login ao aplicativo e chave pública do Supabase não permitem executar migrations.
 
-O ADMIN configura o cabeçalho e o rodapé em **Configurações > Divulgação**. Em **Produtos > Informações para divulgação**, cadastra o nome comercial, os puffs aproximados, uma característica por linha e, opcionalmente, a ordem de exibição. Nome vazio usa o nome interno; características não cadastradas são omitidas. A migration não atribui marcas ou características aos produtos existentes. Puffs como `30000` aparecem como `30K Puffs`.
+O ADMIN configura o cabeçalho e o rodapé em **Configurações > Divulgação**. Em **Produtos**, cadastra marca e modelo (campos já existentes no cadastro) e, em **Informações para divulgação**, o nome comercial, os puffs aproximados, uma característica por linha e, opcionalmente, a ordem de exibição. Nome vazio usa o nome interno; características não cadastradas são omitidas. A migration não atribui marcas ou características aos produtos existentes. Puffs como `30000` aparecem como `30K Puffs`.
+
+A identificação de cada produto na mensagem é `Nome — MARCA MODELO`, montada por uma única função central (`formatProductIdentity` em `lib/domain/promotion.ts`) usada tanto na prévia quanto no texto copiado e enviado para o WhatsApp — não há cópia separada do texto em cada lugar. Marca e/ou modelo em branco são omitidos sem deixar separador sobrando (`Nome — MARCA` ou apenas `Nome`), e qualquer um dos dois já presente no nome (comparação sem diferenciar maiúsculas/minúsculas) não é repetido. Como a identificação é montada a cada geração a partir do cadastro atual, alterar marca ou modelo em **Produtos** reflete na próxima mensagem gerada, sem precisar editar nada na configuração de divulgação.
 
 Em **Estoque > Gerar mensagem para WhatsApp**, cada clique consulta um novo snapshot do banco, independente dos filtros da tela. A prévia pode ser copiada, aberta no WhatsApp sem destinatário predefinido ou compartilhada quando o navegador oferecer compartilhamento nativo. O envio é confirmado pelo usuário no WhatsApp.
 

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   buildWhatsAppPromotion,
   DEFAULT_PROMOTION_SETTINGS,
+  formatProductIdentity,
   formatPromotionPuffs,
   getWhatsAppUrl,
   validatePromotionSettings,
@@ -16,6 +17,8 @@ function product(id: string, variants: PromotionVariant[], overrides: Partial<Pr
   return {
     id,
     name: id,
+    brand: "",
+    model: "",
     promotion_name: null,
     approximate_puffs: 30000,
     promotion_features: [],
@@ -45,13 +48,13 @@ const ignite = product("Pod 30k", [
   variant("Banana Coconut Water", 1),
   variant("Aloe Grape", 1, true),
   variant("Outro sabor", 0),
-], { promotion_name: "IGNITE V300 ULTRA SLIM", promotion_features: ["2 Modos de Potência"], display_order: 1 });
+], { brand: "Ignite", model: "V300 Ultra Slim", promotion_features: ["2 Modos de Potência"], display_order: 1 });
 const sheep = product("Pod 40k", [
   variant("Grape + Menthol", 1),
   variant("Grape + Grape Mango", 1),
   variant("Grape + Grape", 1),
 ], {
-  promotion_name: "THE BLACK SHEEP", approximate_puffs: 40000,
+  brand: "The Black Sheep", model: "40K Dual Flavor", approximate_puffs: 40000,
   promotion_features: ["Dual Flavor", "3 Modos de Potência"], normal_price: "150.00", display_order: 2,
 });
 
@@ -60,7 +63,7 @@ const complete = message(snapshot([sheep, ignite]));
 assert.equal(complete, [
   "📦🔥 PODS DISPONÍVEIS 🔥📦",
   "━━━━━━━━━━━━━━━",
-  "🔹 IGNITE V300 ULTRA SLIM",
+  "🔹 Pod 30k — IGNITE V300 ULTRA SLIM",
   "💰 R$ 140,00",
   "✅ 30K Puffs",
   "✅ 2 Modos de Potência",
@@ -72,7 +75,7 @@ assert.equal(complete, [
   "Watermelon Mix",
   "",
   "━━━━━━━━━━━━━━━",
-  "🔹 THE BLACK SHEEP",
+  "🔹 Pod 40k — THE BLACK SHEEP 40K DUAL FLAVOR",
   "💰 R$ 150,00",
   "✅ 40K Puffs",
   "✅ Dual Flavor",
@@ -156,6 +159,36 @@ assert.ok(ordering.indexOf("\nAlpha") < ordering.indexOf("\nZulu"));
 assert.equal(formatPromotionPuffs(30500), "30,5K Puffs");
 assert.equal(formatPromotionPuffs(900), "900 Puffs");
 assert.equal(formatPromotionPuffs(null), null);
+
+// Product identity centralizes name + brand + model, skipping empty or duplicated pieces.
+assert.equal(formatProductIdentity("Pod 30k", "Ignite", "V300 Ultra Slim"), "Pod 30k — IGNITE V300 ULTRA SLIM");
+assert.equal(formatProductIdentity("Pod 40k", "The Black Sheep", "40K Dual Flavor"), "Pod 40k — THE BLACK SHEEP 40K DUAL FLAVOR");
+assert.equal(formatProductIdentity("Pod 30k", "Ignite", null), "Pod 30k — IGNITE");
+assert.equal(formatProductIdentity("Pod 30k", "", ""), "Pod 30k");
+assert.equal(formatProductIdentity("Pod 30k", null, undefined), "Pod 30k");
+assert.equal(formatProductIdentity("Pod 30k", "  ", "  "), "Pod 30k");
+assert.equal(formatProductIdentity("IGNITE V300 ULTRA SLIM", "Ignite", "V300 Ultra Slim"), "IGNITE V300 ULTRA SLIM");
+assert.equal(formatProductIdentity("Pod 30k Ignite", "Ignite", "V300 Ultra Slim"), "Pod 30k Ignite — V300 ULTRA SLIM");
+assert.ok(!formatProductIdentity("Pod 30k", "Ignite", "V300 Ultra Slim").includes("null"));
+assert.ok(!formatProductIdentity("Pod 30k", "Ignite", "V300 Ultra Slim").includes("undefined"));
+
+// A product without brand/model keeps working and shows only the registered name.
+const noBrandModel = message(snapshot([product("Simples", [variant("Teste", 1)])]));
+assert.ok(noBrandModel.includes("🔹 Simples\n"));
+// A product with brand but no model shows "Name — BRAND" without stray separators.
+const brandOnly = message(snapshot([product("Com marca", [variant("Teste", 1)], { brand: "Ignite" })]));
+assert.ok(brandOnly.includes("🔹 Com marca — IGNITE\n"));
+// Preview, copy and WhatsApp share all read from the same buildWhatsAppPromotion message,
+// so brand/model changes in the catalog are reflected the next time it is generated.
+const beforeBrandChange = message(snapshot([product("Atualiza", [variant("Teste", 1)], { brand: "Antigo" })]));
+assert.ok(beforeBrandChange.includes("🔹 Atualiza — ANTIGO\n"));
+const afterBrandChange = message(snapshot([product("Atualiza", [variant("Teste", 1)], { brand: "Novo" })]));
+assert.ok(afterBrandChange.includes("🔹 Atualiza — NOVO\n"));
+// A custom commercial name (promotion_name) still gets brand/model appended.
+const customName = message(snapshot([product("Interno", [variant("Teste", 1)], {
+  promotion_name: "Nome Comercial", brand: "Marca", model: "Modelo X",
+})]));
+assert.ok(customName.includes("🔹 Nome Comercial — MARCA MODELO X\n"));
 
 // Header/footer are configurable plain text, with bounded inputs and legacy HTML blocked.
 const custom = message(snapshot([ignite], { settings: { header: "Novidades 🥳", footer: "📍 São Paulo\nPeça já!" } }));
