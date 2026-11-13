@@ -5,7 +5,8 @@ import type { SaleOverview } from "@/lib/types";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CreditBadge, PaymentBadge, TransferBadge } from "@/components/sales/badges";
 
-export function SaleList({ sales, consultas = false }: { sales: SaleOverview[]; consultas?: boolean }) {
+export function SaleList({ sales, consultas = false, returnPath }: { sales: SaleOverview[]; consultas?: boolean; returnPath?: string }) {
+  const saleHref = (id: string) => `/vendas/${id}${returnPath ? `?voltar=${encodeURIComponent(returnPath)}` : ""}`;
   if (sales.length === 0) {
     return (
       <EmptyState
@@ -39,7 +40,7 @@ export function SaleList({ sales, consultas = false }: { sales: SaleOverview[]; 
                 <tr key={sale.id} className="group">
                   <td className="whitespace-nowrap text-muted-foreground">{formatDate(sale.sale_date)}</td>
                   <td>
-                    <Link href={`/vendas/${sale.id}`} className="font-medium hover:text-primary">
+                    <Link href={saleHref(sale.id)} className="font-medium hover:text-primary">
                       {sale.customer_name}
                     </Link>
                     <p className="text-xs text-muted-foreground">{sale.customer_type_name}</p>
@@ -70,7 +71,7 @@ export function SaleList({ sales, consultas = false }: { sales: SaleOverview[]; 
                   </td>
                   <td>
                     <Link
-                      href={`/vendas/${sale.id}`}
+                      href={saleHref(sale.id)}
                       aria-label={`Abrir venda de ${sale.customer_name}`}
                       className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                     >
@@ -89,7 +90,7 @@ export function SaleList({ sales, consultas = false }: { sales: SaleOverview[]; 
         {sales.map((sale) => (
           <Link
             key={sale.id}
-            href={`/vendas/${sale.id}`}
+            href={saleHref(sale.id)}
             className="tech-card press block min-w-0 p-4 transition-colors hover:border-primary/50"
           >
             <div className="flex min-w-0 items-start justify-between gap-2">

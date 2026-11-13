@@ -59,7 +59,7 @@ export default async function InicioPage({
   const batchNotice = batchesResult.ok ? undefined : "Não foi possível carregar os lotes. Exibindo Todos os lotes.";
   const currentUrl = buildFilterUrl("/inicio", params);
   const salesUrl = buildFilterUrl("/vendas", params, {
-    lote: batchFilter.batchId ?? undefined,
+    lote: batchFilter.value,
     periodo: undefined,
     de: period.from ?? undefined,
     ate: period.to ?? undefined,

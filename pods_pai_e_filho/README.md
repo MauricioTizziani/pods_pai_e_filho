@@ -83,7 +83,7 @@ O teste usa PostgreSQL em memória (PGlite), sem credenciais ou acesso ao Supaba
 
 ### Filtros iniciais
 
-**Dashboard**, **Relatórios** e **Repasses** iniciam no lote aberto com a compra mais recente, usando a mesma função `resolveBatchFilter`. Sem lote aberto, usam o finalizado mais recente; sem lotes válidos, usam **Todos os lotes**, incluindo o histórico sem lote. Empates usam criação, número do lote e identificador. Lotes cancelados não são selecionados automaticamente.
+**Dashboard**, **Relatórios**, **Repasses** e **Vendas** iniciam no lote aberto com a compra mais recente, usando a mesma função `resolveBatchFilter`. Sem lote aberto, usam o finalizado mais recente; sem lotes válidos, usam **Todos os lotes**, incluindo o histórico sem lote. Empates usam criação, número do lote e identificador. Lotes cancelados não são selecionados automaticamente.
 
 A seleção fica na URL e é respeitada nas atualizações e na volta de uma venda à Dashboard. **Todos os lotes** permanece disponível. Período e demais filtros são combinados com o lote. Os valores financeiros usam as alocações existentes de cada item vendido; uma venda com dois lotes contribui apenas com sua parcela em cada lote. Estoque atual, custo do estoque e alertas continuam gerais e são identificados assim na tela.
 
@@ -112,6 +112,18 @@ npm run check:financial-filters
 npm run check:product-filters
 npm run check:dashboard-filters
 npm run check:stock-visibility
+```
+
+### Histórico de vendas paginado
+
+**Vendas** mostra até 50 registros por página, com o total correspondente aos filtros e os controles **Anterior** e **Próxima**. O histórico deixa de ficar limitado às 200 vendas mais recentes. Ao abrir a aba, o lote em andamento mais recente é selecionado automaticamente. É possível escolher outro lote ou **Todos os lotes**, e a seleção explícita é preservada. Página e filtros ficam na URL e são preservados ao abrir uma venda e usar **Voltar às vendas**. Aplicar filtros reinicia a navegação na primeira página; **Limpar filtros** restaura o lote padrão e a primeira página. Um endereço além do resultado redireciona para a última página disponível.
+
+A contagem respeita as mesmas permissões e filtros da listagem, inclusive para CONSULTAS, sem exibir a classificação Fiado nesse perfil. Consultas por lote leem os vínculos em páginas e grupos de identificadores para preservar resultados de lotes grandes. A melhoria usa somente consultas de leitura, mantém o comportamento dos demais consumidores e não exige migration nem altera vendas, pagamentos, estoque ou qualquer dado salvo.
+
+Para verificar com dados locais simulados, sem credenciais ou acesso ao Supabase:
+
+```bash
+npm run check:sales-pagination
 ```
 
 ## Regras que o banco garante

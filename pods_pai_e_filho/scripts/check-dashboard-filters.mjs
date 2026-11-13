@@ -239,4 +239,40 @@ for (const route of routes) {
   }
 }
 
+// Opening Vendas must preserve the dashboard's selection now that its default
+// is the newest open batch rather than the general sales history.
+for (const role of ["ADMIN", "CONSULTAS"]) {
+  for (const selection of ["todos", "", "open-new", "open-old", "finished", "cancelled"]) {
+    const result = await render("inicio", {
+      lote: selection,
+      periodo: "personalizado",
+      de: "2026-09-01",
+      ate: "2026-09-30",
+      cliente: "João & Filhos",
+    }, { role });
+    assert.equal(result.redirect, null);
+    let salesUrls;
+    if (role === "CONSULTAS") {
+      assert.equal(result.tree.type.name, "ConsultasDashboard");
+      salesUrls = [result.tree.props.salesUrl];
+    } else {
+      const salesCard = walk(result.tree, (element) => element.type?.name === "StatCard" && element.props.label === "Vendas");
+      const recentPanel = walk(result.tree, (element) => element.type?.name === "Panel" && element.props.title === "Movimentações recentes");
+      assert.ok(salesCard, "o indicador de vendas está presente");
+      assert.ok(recentPanel?.props.action, "o histórico recente tem ação para abrir todas as vendas");
+      salesUrls = [salesCard.props.href, recentPanel.props.action.props.href];
+    }
+    for (const salesUrl of salesUrls) {
+      const target = new URL(salesUrl, "https://example.test");
+      assert.equal(target.pathname, "/vendas");
+      assert.equal(target.searchParams.get("lote"), selection || "todos", `${role}: a navegação preserva o lote, inclusive Todos explícito`);
+      assert.equal(target.searchParams.get("de"), "2026-09-01");
+      assert.equal(target.searchParams.get("ate"), "2026-09-30");
+      assert.equal(target.searchParams.get("cliente"), "João & Filhos");
+      assert.equal(target.searchParams.has("periodo"), false, "Vendas recebe o intervalo já resolvido");
+    }
+    scenarios++;
+  }
+}
+
 console.log(`check-dashboard-filters: ok (${scenarios} cenários; páginas reais com dados simulados)`);
