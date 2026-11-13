@@ -44,6 +44,7 @@ const products = [
   { id: "active-positive", name: "Pod ativo", active: true },
   { id: "active-zero", name: "Pod esgotado", active: true },
   { id: "active-no-variants", name: "Pod sem sabores", active: true },
+  { id: "active-all-inactive", name: "Pod só inativos", active: true },
 ].map((product) => ({ ...product, brand: "", model: "", approximate_puffs: null, cost_price: "10.00" }));
 const balances = [
   { product_id: "inactive-positive", variant_id: "hidden-grape", variant_name: "Forbidden", variant_is_ice: true, quantity: 3 },
@@ -51,10 +52,13 @@ const balances = [
   { product_id: "active-positive", variant_id: "grape", variant_name: "Grape", variant_is_ice: true, quantity: 1 },
   { product_id: "active-positive", variant_id: "strawberry", variant_name: "Strawberry", variant_is_ice: false, quantity: 4 },
   { product_id: "active-zero", variant_id: "zero", variant_name: "Mint", variant_is_ice: false, quantity: 0 },
-].map((balance) => ({ ...balance, variant_active: true }));
+  { product_id: "active-positive", variant_id: "off-berry", variant_name: "Offberry", variant_is_ice: false, quantity: 3, variant_active: false },
+  { product_id: "active-zero", variant_id: "off-zero", variant_name: "Offzero", variant_is_ice: true, quantity: 0, variant_active: false },
+  { product_id: "active-all-inactive", variant_id: "off-only", variant_name: "Onlyoff", variant_is_ice: false, quantity: 2, variant_active: false },
+].map((balance) => ({ variant_active: true, ...balance }));
 const fixtures = {
   products,
-  product_variants: balances.map((balance) => ({ id: balance.variant_id, product_id: balance.product_id, active: true })),
+  product_variants: balances.map((balance) => ({ id: balance.variant_id, product_id: balance.product_id, active: balance.variant_active })),
   stock_movement_history: [
     ...Array.from({ length: 12 }, (_, index) => ({ id: `hidden-${index}`, product_id: "inactive-positive", product_name: "Antigo com saldo", variant_name: "Forbidden Ice", direction: 1, quantity: 3 })),
     { id: "visible", product_id: "active-positive", product_name: "Pod ativo", variant_name: "Grape Ice", direction: 1, quantity: 1 },
@@ -132,16 +136,21 @@ const productNames = (tree) => productPanels(tree).map((panel) => panel.props.ti
 const stockBadges = (tree) => productPanels(tree).flatMap((panel) => elements(panel.props.action)).filter((element) => element.type === StockBadge);
 
 let tree = await render();
-assert.deepEqual(productNames(tree), ["Pod ativo", "Pod esgotado", "Pod sem sabores"]);
+assert.deepEqual(productNames(tree), ["Pod ativo", "Pod esgotado", "Pod sem sabores", "Pod só inativos"]);
 assert.equal(text(tree).includes("Forbidden"), false, "produto inativo e seus sabores não aparecem");
-assert.equal(elements(tree).find((element) => element.type === PageHeading).props.eyebrow, "3 produto(s) · 5 unidades exibidas");
-assert.deepEqual(stockBadges(tree).map((element) => element.props.quantity), [5, 0, 0], "alerta usa soma do produto");
+for (const hidden of ["Offberry", "Offzero", "Onlyoff"]) assert.equal(text(tree).includes(hidden), false, `sabor inativo ${hidden} não aparece`);
+assert.equal(text(tree).includes("Mint"), true, "sabor ativo sem estoque mantém o comportamento atual");
+assert.equal(elements(tree).find((element) => element.type === PageHeading).props.eyebrow, "4 produto(s) · 5 unidades exibidas");
+assert.deepEqual(stockBadges(tree).map((element) => element.props.quantity), [5, 0, 0, 0], "alerta usa soma do produto");
+const allInactivePanel = productPanels(tree).find((panel) => panel.props.title === "Pod só inativos");
+assert.ok(text(allInactivePanel.props.children).includes("Nenhum sabor ativo disponível"));
+assert.ok(text(productPanels(tree).find((panel) => panel.props.title === "Pod sem sabores").props.children).includes("Nenhuma variação cadastrada."));
 assert.ok(elements(tree).find((element) => element.type === StockEntryForm).props.stock.every((balance) => balance.product_active));
 const movementRequest = requests.find((request) => request.table === "stock_movement_history");
 assert.ok(movementRequest.operations.findIndex(([operation]) => operation === "in") < movementRequest.operations.findIndex(([operation]) => operation === "limit"), "filtra movimentos antes do limite de 12");
 assert.equal(text(tree).includes("Grape Ice"), true, "movimento ativo aparece mesmo após 12 movimentos inativos");
 
-for (const params of [{ sabor: "Forbidden Ice" }, { sabor: "Antigo com saldo" }, { sabor: "Hidden", ice: "nao" }]) {
+for (const params of [{ sabor: "Forbidden Ice" }, { sabor: "Antigo com saldo" }, { sabor: "Hidden", ice: "nao" }, { sabor: "Offberry" }, { sabor: "Offzero Ice", ice: "sim" }, { sabor: "Onlyoff", ice: "nao" }, { ice: "sim", sabor: "Offzero" }]) {
   tree = await render(params);
   assert.equal(productPanels(tree).length, 0);
   assert.ok(text(tree).includes("Nenhum produto ativo encontrado para os filtros informados."));
@@ -153,13 +162,17 @@ assert.equal(stockBadges(tree)[0].props.quantity, 5, "busca de sabor não altera
 assert.ok(elements(tree).some((element) => element.type === "input" && element.props.name === "lote" && element.props.value === "preservado"));
 stockCap = 1;
 requests.length = 0;
-const capped = await loadCatalog({ productStatus: "active", stockActiveProductsOnly: true });
+const capped = await loadCatalog({ productStatus: "active", stockActiveProductsOnly: true, stockActiveVariantsOnly: true });
 assert.equal(capped.data.stock[0].variant_id, "grape", "status aplicado antes do limite do servidor");
-assert.ok(requests.find((request) => request.table === "stock_balances").operations.some(([operation, column, value]) => operation === "eq" && column === "product_active" && value === true));
+const cappedOps = requests.find((request) => request.table === "stock_balances").operations;
+assert.ok(cappedOps.some(([operation, column, value]) => operation === "eq" && column === "product_active" && value === true));
+assert.ok(cappedOps.some(([operation, column, value]) => operation === "eq" && column === "variant_active" && value === true), "sabor ativo filtrado na consulta");
 stockCap = Infinity;
 const general = await loadCatalog();
 assert.equal(general.data.stock.some((balance) => !balance.product_active && balance.quantity === 3), true, "outras consultas e histórico não recebem o filtro");
-assert.equal(general.data.products.length, 5);
+assert.equal(general.data.stock.some((balance) => !balance.variant_active && balance.quantity === 3), true, "gerenciamento e demais telas continuam vendo sabores inativos");
+assert.equal(general.data.variants.some((variant) => variant.id === "off-berry" && !variant.active), true, "variantes inativas continuam no gerenciamento");
+assert.equal(general.data.products.length, 6);
 assert.equal((await loadCatalog({ productStatus: "inactive" })).data.products.length, 2, "filtro Inativos de Produtos preservado");
 
 const invalidatedPaths = [];
@@ -178,9 +191,19 @@ assert.deepEqual(productNames(tree), ["Pod ativo"]);
 assert.equal(stockBadges(tree)[0].props.quantity, 5, "reativação preserva saldo e sabores");
 assert.ok(invalidatedPaths.every(([pathname, type]) => pathname === "/" && type === "layout"), "invalidação inclui a tela Estoque");
 assert.equal(invalidatedPaths.length, 2);
+const berry = balances.find((balance) => balance.variant_id === "off-berry");
+berry.variant_active = false;
+tree = await render({ sabor: "Offberry" });
+assert.equal(productPanels(tree).length, 0, "sabor inativo não aparece na pesquisa");
+berry.variant_active = true;
+tree = await render({ sabor: "Offberry" });
+assert.deepEqual(productNames(tree), ["Pod ativo"], "reativar o sabor o traz de volta");
+assert.equal(elements(tree).find((element) => element.type === PageHeading).props.eyebrow, "1 produto(s) · 3 unidades exibidas", "saldo preservado ao reativar");
+berry.variant_active = false;
 role = "CONSULTAS";
 tree = await render();
-assert.deepEqual(productNames(tree), ["Pod ativo", "Pod esgotado", "Pod sem sabores"]);
+assert.deepEqual(productNames(tree), ["Pod ativo", "Pod esgotado", "Pod sem sabores", "Pod só inativos"]);
+assert.equal(text(tree).includes("Offberry"), false);
 assert.equal(elements(tree).some((element) => element.type === StockEntryForm), false);
 assert.equal((await saveProductAction(statusInput("active-positive", false))).ok, false, "CONSULTAS permanece sem escrita");
 assert.equal(products.find((product) => product.id === "active-positive").active, true);

@@ -17,9 +17,12 @@ export type ProductStatusFilter = "all" | "active" | "inactive";
 export async function loadCatalog({
   productStatus = "all",
   stockActiveProductsOnly = false,
+  stockActiveVariantsOnly = false,
 }: {
   productStatus?: ProductStatusFilter;
   stockActiveProductsOnly?: boolean;
+  /** Only returns balances of active flavors; inactive ones keep their rows and quantities in the database. */
+  stockActiveVariantsOnly?: boolean;
 } = {}): Promise<
   { ok: true; data: CatalogSnapshot } | { ok: false; message: string }
 > {
@@ -30,6 +33,7 @@ export async function loadCatalog({
   }
   let stockQuery = supabase.from("stock_balances").select("*");
   if (stockActiveProductsOnly) stockQuery = stockQuery.eq("product_active", true);
+  if (stockActiveVariantsOnly) stockQuery = stockQuery.eq("variant_active", true);
   const [products, variants, customerTypes, statuses, prices, customers, stock, saleItems, movements, countLines, batchItems] =
     await Promise.all([
       productsQuery.order("name"),

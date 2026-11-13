@@ -14,7 +14,6 @@ import { WhatsAppPromotion } from "@/components/stock/whatsapp-promotion";
 import { IceBadge, StockBadge, VariantAvailabilityBadge } from "@/components/sales/badges";
 import { IceFilterSelect } from "@/components/catalog/flavor-filters";
 import { Panel } from "@/components/ui/panel";
-import { Badge } from "@/components/ui/badge";
 import { controlClass } from "@/components/ui/field";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -32,7 +31,7 @@ export default async function EstoquePage({
     Object.entries(rawParams).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value]),
   );
   const [catalog, session, threshold] = await Promise.all([
-    loadCatalog({ productStatus: "active", stockActiveProductsOnly: true }),
+    loadCatalog({ productStatus: "active", stockActiveProductsOnly: true, stockActiveVariantsOnly: true }),
     getSessionState(),
     loadLowStockThreshold(),
   ]);
@@ -78,10 +77,11 @@ export default async function EstoquePage({
     group.items.push(item);
     groups.set(item.product_id, group);
   }
+  // Active products stay listed without filters even when no active flavor is left to show.
   const hasVariant = new Set(catalog.data.variants.map((variant) => variant.product_id));
   if (!flavorQuery.trim() && iceFilter === "all") {
     for (const product of catalog.data.products) {
-      if (product.active && !hasVariant.has(product.id)) {
+      if (product.active && !groups.has(product.id)) {
         groups.set(product.id, { name: product.name, items: [] });
       }
     }
@@ -170,7 +170,6 @@ export default async function EstoquePage({
                         <span className="flex min-w-0 flex-1 items-start gap-2">
                           <span className="min-w-0 break-words">{item.variant_name}</span>
                           {item.variant_is_ice ? <IceBadge /> : <span className="shrink-0 text-xs text-muted-foreground">Normal</span>}
-                          {!item.variant_active ? <Badge variant="neutral">inativo</Badge> : null}
                         </span>
                         <span className="flex shrink-0 items-center gap-2">
                           <VariantAvailabilityBadge quantity={item.quantity} />
@@ -218,7 +217,9 @@ export default async function EstoquePage({
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-muted-foreground">Nenhuma variação cadastrada.</p>
+                <p className="text-sm text-muted-foreground">
+                  {hasVariant.has(productId) ? "Nenhum sabor ativo disponível" : "Nenhuma variação cadastrada."}
+                </p>
               )}
             </Panel>
           );
