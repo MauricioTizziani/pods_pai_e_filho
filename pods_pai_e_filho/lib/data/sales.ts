@@ -37,9 +37,36 @@ export type SaleQuery = {
   includeCount?: boolean;
 };
 
+export type OpenCreditSummary = {
+  count: number;
+  receivable: number;
+  transferPending: number;
+};
+
 type CostLine = { cost_price_unit: string | null; line_cost: string | null; line_father_profit: string | null };
 type RowsResult = { data: unknown[] | null; error: { message: string } | null };
 const RELATED_PAGE_SIZE = 500;
+
+export async function getOpenCreditSummary() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("open_credit_summary");
+  if (error) return { ok: false as const, message: error.message };
+
+  const row = Array.isArray(data) ? data[0] as Record<string, unknown> | undefined : undefined;
+  const count = Number(row?.open_credit_count);
+  const receivable = Number(row?.receivable_amount);
+  const transferPending = Number(row?.transfer_pending);
+  if (!row || !Number.isSafeInteger(count) || count < 0 ||
+    !Number.isFinite(receivable) || receivable < 0 ||
+    !Number.isFinite(transferPending) || transferPending < 0) {
+    return { ok: false as const, message: "O resumo de fiados retornou dados inválidos." };
+  }
+
+  return {
+    ok: true as const,
+    summary: { count, receivable, transferPending } satisfies OpenCreditSummary,
+  };
+}
 
 // Continue to an empty page so a lower API row cap never hides related sales.
 async function readAll<T>(request: (from: number, to: number) => PromiseLike<RowsResult>) {

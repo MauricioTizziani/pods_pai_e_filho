@@ -198,6 +198,35 @@ await test("canceladas continuam disponíveis e separadas das vendas válidas", 
   data.assertUnchanged();
 });
 
+await test("Fiados filtra somente crédito a receber válido e pagina após aplicar os critérios", async () => {
+  const eligible = Array.from({ length: 75 }, (_, index) => sale(index, {
+    is_credit: true,
+    counts_as_receivable: true,
+    counts_as_received: false,
+    is_valid: true,
+    transfer_due_now: true,
+  }));
+  const rows = [
+    ...eligible,
+    sale(100, { is_credit: true, counts_as_receivable: false, counts_as_received: true }),
+    sale(101, { is_credit: true, counts_as_receivable: true, is_valid: false }),
+    sale(102, { is_credit: false, counts_as_receivable: true }),
+  ];
+  const data = harness({ sales_overview: rows });
+  const result = await data.listSales({ openCredit: true, includeCount: true, includeCosts: false, offset: 50, limit: 50 });
+  assert.equal(result.ok, true);
+  assert.equal(result.totalCount, 75);
+  assert.equal(result.sales.length, 25);
+  assert.ok(result.sales.every((row) => row.is_credit && row.counts_as_receivable && row.is_valid));
+  const request = data.requests[0];
+  for (const [column, value] of [["is_credit", true], ["counts_as_receivable", true], ["is_valid", true]]) {
+    assert.ok(request.operations.some(([operation, field, expected]) => operation === "eq" && field === column && expected === value), column);
+  }
+  assert.ok(request.operations.some(([operation, from, to]) => operation === "range" && from === 50 && to === 99));
+  assert.deepEqual(request.orders, [["sale_date", false], ["created_at", false], ["id", false]]);
+  data.assertUnchanged();
+});
+
 await test("lote percorre mais de mil vínculos e respeita resposta da API menor que a página solicitada", async () => {
   const rows = Array.from({ length: 1105 }, (_, index) => sale(index));
   const fixtures = {

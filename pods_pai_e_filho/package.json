@@ -18,7 +18,8 @@
     "check:dashboard-filters": "node scripts/check-dashboard-filters.mjs",
     "check:stock-visibility": "node scripts/check-stock-visibility.mjs",
     "check:transfer-filters": "node scripts/check-transfer-filters.mjs",
-    "check:sales-pagination": "node scripts/check-sales-pagination.mjs"
+    "check:sales-pagination": "node scripts/check-sales-pagination.mjs",
+    "check:credit-pagination": "node scripts/check-credit-pagination.mjs"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.1",
